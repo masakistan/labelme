@@ -65,21 +65,22 @@ def main():
     )
 
     class_name_to_id = {}
+    class_id = 0
     for i, line in enumerate(open(args.labels).readlines()):
-        class_id = i - 1  # starts with -1
         class_name = line.strip()
-        if class_id == -1:
+        if i == 0:
             assert class_name == '__ignore__'
             continue
-        elif class_id == 0:
+        elif i == 1:
             assert class_name == '_background_'
-        class_name_to_id[class_name] = class_id
+        class_name_to_id[class_name] = i
         data['categories'].append(dict(
             supercategory=None,
-            id=class_id,
+            id=i,
             name=class_name,
         ))
 
+    annot_count = 0
     out_ann_file = osp.join(args.output_dir, 'annotations.json')
     label_files = glob.glob(osp.join(args.input_dir, '*.json'))
     for image_id, label_file in enumerate(label_files):
@@ -130,13 +131,17 @@ def main():
             segmentation = pycocotools.mask.encode(mask)
             segmentation['counts'] = segmentation['counts'].decode()
             area = float(pycocotools.mask.area(segmentation))
+            bbox = list(pycocotools.mask.toBbox(segmentation))
             data['annotations'].append(dict(
                 segmentation=segmentation,
                 area=area,
-                iscrowd=None,
+                iscrowd=1,
                 image_id=image_id,
                 category_id=cls_id,
+                id=annot_count,
+                bbox=bbox,
             ))
+            annot_count += 1
 
     with open(out_ann_file, 'w') as f:
         json.dump(data, f)
