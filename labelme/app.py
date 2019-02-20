@@ -20,7 +20,7 @@ from labelme import QT5
 from labelme.config import get_config
 from labelme.label_file import LabelFile
 from labelme.label_file import LabelFileError
-from labelme import logger
+from labelme.logger import logger
 from labelme.shape import DEFAULT_FILL_COLOR
 from labelme.shape import DEFAULT_LINE_COLOR
 from labelme.shape import Shape
@@ -817,7 +817,7 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         if not self.canvas.editing():
             return
         item = item if item else self.currentItem()
-        text = self.labelDialog.popUp(item.text())
+        text = self.labelDialog.popUp(item.text() if item else None)
         if text is None:
             return
         if not self.validateLabel(text):
