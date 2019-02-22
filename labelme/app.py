@@ -136,9 +136,13 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         self.uniqLabelList.setToolTip(
             "Select label to start annotating for it. "
             "Press 'Esc' to deselect.")
+        self.autolabel = False
+        print("fart")
         if self._config['labels']:
             self.uniqLabelList.addItems(self._config['labels'])
             self.uniqLabelList.sortItems()
+            if len(self._config['labels']) == 1:
+                self.autolabel = True
         self.label_dock = QtWidgets.QDockWidget(u'Label List', self)
         self.label_dock.setObjectName(u'Label List')
         self.label_dock.setWidget(self.uniqLabelList)
@@ -1001,7 +1005,10 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
         if items:
             text = items[0].text()
         if self._config['display_label_popup'] or not text:
-            text = self.labelDialog.popUp(text)
+            if self.autolabel:
+                text = self._config['labels'][0]
+            else:
+                text = self.labelDialog.popUp(text)
         if text is not None and not self.validateLabel(text):
             self.errorMessage('Invalid label',
                               "Invalid label '{}' with validation type '{}'"
