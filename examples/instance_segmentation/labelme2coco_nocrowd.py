@@ -121,12 +121,22 @@ def main():
             )
 
             mask = np.asfortranarray(mask.astype(np.uint8))
+
+            if shape['shape_type'] == 'polygon':
+                coords = [coord for coords in points for coord in coords]
+            elif shape['shape_type'] == 'rectangle':
+                x1, y1 = points[0]
+                x2, y2 = points[1]
+                coords = [x1, y1, x1, y2, x2, y2, x2, y1]
+            else:
+                raise Exception('unknown shape type')
+
             if label in masks:
                 masks[label] = masks[label] | mask
-                polygons[label].append(points)
+                polygons[label].append(coords)
             else:
                 masks[label] = mask
-                polygons[label] = [[coord for coords in points for coord in coords]]
+                polygons[label] = [coords]
 
         for label, mask in masks.items():
             print label, polygons[label]
@@ -140,8 +150,10 @@ def main():
             bbox = list(pycocotools.mask.toBbox(segmentation))
             data['annotations'].append(dict(
                 segmentation = polygons[label],
+                #segmentation = segmentation,
                 area=area,
                 iscrowd = 0,
+                #iscrowd = 1,
                 image_id=image_id,
                 category_id=cls_id,
                 id=annot_count,
