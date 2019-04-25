@@ -1008,7 +1008,10 @@ class MainWindow(QtWidgets.QMainWindow, WindowMixin):
             if self.autolabel:
                 text = self._config['labels'][0]
             else:
-                text = self.labelDialog.popUp(text)
+                if text is None:
+                    text = self.labelDialog.popUp(text)
+                else:
+                    text = text
         if text is not None and not self.validateLabel(text):
             self.errorMessage('Invalid label',
                               "Invalid label '{}' with validation type '{}'"
