@@ -86,7 +86,9 @@ def main():
     for image_id, label_file in enumerate(label_files):
         print('Generating dataset from:', label_file)
         with open(label_file) as f:
+            print('\tloading json')
             label_data = json.load(f)
+            print('\t\tdone')
 
         base = osp.splitext(osp.basename(label_file))[0]
         out_img_file = osp.join(
@@ -111,6 +113,7 @@ def main():
         polygons = []
         #masks = {}
         for shape in label_data['shapes']:
+            print(shape['label'], shape['points'])
             points = shape['points']
             label = shape['label']
             shape_type = shape.get('shape_type', None)
@@ -139,10 +142,11 @@ def main():
 
         #for label, mask in masks.items():
         for label, mask, polygon in polygons:
-            #print label, polygons[label]
-            print label, polygon
+            print(label)
+            #print label, polygon
             cls_name = label.split('-')[0]
             if cls_name not in class_name_to_id:
+                print('skipping')
                 continue
             cls_id = class_name_to_id[cls_name]
             segmentation = pycocotools.mask.encode(mask)
