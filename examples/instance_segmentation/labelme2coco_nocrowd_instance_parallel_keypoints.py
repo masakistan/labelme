@@ -203,6 +203,8 @@ def process(image_id, label_file, output_dir, class_name_to_id):
 
         if shape['shape_type'] == 'polygon':
             coords = [coord for coords in points for coord in coords]
+            if len(coords) > 8:
+                print("WARNING! polygon has more points than expeted {}".format(coords))
         elif shape['shape_type'] == 'rectangle':
             x1, y1 = points[0]
             x2, y2 = points[1]
@@ -248,7 +250,7 @@ def process(image_id, label_file, output_dir, class_name_to_id):
         #print(list([(i[0], i[1]) for i in vals]))
 
 
-    print('before', tkps)
+    #print('before', tkps)
     label = 'name_col_field'
     tkps['name_col'] += tkps[label]
     if len(fields[label]) < 50:
@@ -289,11 +291,11 @@ def process(image_id, label_file, output_dir, class_name_to_id):
 
     #print(tkps)
 
-    print(tkps)
+    #print(tkps)
         
     annotations = []
     for label, mask, polygon in polygons:
-        print(label)
+        #print(label)
         #if label != 'name_col':
         #    continue
 
