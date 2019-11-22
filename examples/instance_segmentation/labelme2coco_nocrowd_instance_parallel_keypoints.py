@@ -355,7 +355,7 @@ def process(image_id, label_file, output_dir, class_name_to_id):
         ))
         #annot_count += 1
 
-    PIL.Image.fromarray(img).save(out_img_file)
+    #PIL.Image.fromarray(img).save(out_img_file)
        
     return img, out_img_file, annotations
 
