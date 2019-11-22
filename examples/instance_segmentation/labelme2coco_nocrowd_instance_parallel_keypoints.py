@@ -114,7 +114,7 @@ def main():
         )
 
         if class_name in skeletons:
-            print(class_name, len(skeletons[class_name]), len(keypoints[class_name]))
+            #print(class_name, len(skeletons[class_name]), len(keypoints[class_name]))
             d['skeleton'] = skeletons[class_name]
             d['keypoints'] = keypoints[class_name]
         data['categories'].append(d)
@@ -133,7 +133,7 @@ def main():
 
 
     for image_id, img, out_img_file, annotations in img_dataloader:
-        print(image_id, out_img_file)
+        #print(image_id, out_img_file)
         data['images'].append(dict(
             license=0,
             url=None,
@@ -213,8 +213,15 @@ def process(image_id, label_file, output_dir, class_name_to_id):
         y_center = int((min(ys) + max(ys)) // 2)
         xs = [coords[i] for i in range(0, len(coords), 2)]
         x_center = int((min(xs) + max(xs)) // 2)
-        print(label, y_center)
+        #print(label, y_center)
 
+        #coords = [
+        #    [coords[0], coords[1]],
+        #    [coords[2], coords[3]],
+        #    [coords[4], coords[5]],
+        #    [coords[6], coords[7]],
+        #]
+        coords = list(map(int, coords))
         polygon = (x_center, y_center, 2, label, mask, coords)
 
         if label in fields:
@@ -241,54 +248,57 @@ def process(image_id, label_file, output_dir, class_name_to_id):
         #print(list([(i[0], i[1]) for i in vals]))
 
 
+    print('before', tkps)
     label = 'name_col_field'
+    tkps['name_col'] += tkps[label]
     if len(fields[label]) < 50:
-        tkps['name_col'] += tkps[label]
-        print('padding name', 50 - len(fields[label]))
-        pad = list([(0, 0, 0) for i in range(50 - len(fields[label]))])
+        #print('padding name', 50 - len(fields[label]))
+        pad = list([(0, 0, 0, None, None, None) for i in range(50 - len(fields[label]))])
         fields[label] = fields[label] + pad
 
     label = 'veteran_col_yes_or_no'
+    tkps['veteran_col'] += tkps[label]
     if len(fields[label]) < 50:
-        tkps['veteran_col'] += tkps[label]
-        pad = list([(0, 0, 0) for i in range(50 - len(fields[label]))])
+        pad = list([(0, 0, 0, None, None, None) for i in range(50 - len(fields[label]))])
         fields[label] = fields[label] + pad
 
     label = 'veteran_col_war_or_expedition'
+    tkps['veteran_col'] += tkps[label]
     if len(fields[label]) < 50:
-        tkps['veteran_col'] += tkps[label]
-        pad = list([(0, 0, 0) for i in range(50 - len(fields[label]))])
+        pad = list([(0, 0, 0, None, None, None) for i in range(50 - len(fields[label]))])
         fields[label] = fields[label] + pad
 
     label = 'occupation_col_industry_field'
+    tkps['occupation_col'] += tkps[label]
     if len(fields[label]) < 50:
-        tkps['occupation_col'] += tkps[label]
-        pad = list([(0, 0, 0) for i in range(50 - len(fields[label]))])
+        pad = list([(0, 0, 0, None, None, None) for i in range(50 - len(fields[label]))])
         fields[label] = fields[label] + pad
 
     label = 'occupation_col_occupation_field'
+    tkps['occupation_col'] += tkps[label]
     if len(fields[label]) < 50:
-        tkps['occupation_col'] += tkps[label]
-        pad = list([(0, 0, 0) for i in range(50 - len(fields[label]))])
+        pad = list([(0, 0, 0, None, None, None) for i in range(50 - len(fields[label]))])
         fields[label] = fields[label] + pad
 
     
     name_col += fields['name_col_field']
     veteran_col += fields['veteran_col_yes_or_no'] + fields['veteran_col_war_or_expedition']
     occupation_col += fields['occupation_col_occupation_field'] + fields['occupation_col_industry_field']
-    print(len(polygons))
-    print(list([(i[0], i[1], i[2]) for i in name_col]))
+    #print(len(polygons))
+    #print(list([(i[0], i[1], i[2]) for i in name_col]))
+
+    #print(tkps)
 
     print(tkps)
         
     annotations = []
     for label, mask, polygon in polygons:
         print(label)
-        if label != 'name_col':
-            continue
+        #if label != 'name_col':
+        #    continue
 
         nkps = tkps[label]
-        print('total kps', nkps)
+        #print('total kps', nkps)
         if label == 'name_col':
             kps = name_col
             exp = expected_name_kps
@@ -300,16 +310,25 @@ def process(image_id, label_file, output_dir, class_name_to_id):
             exp = expected_veteran_kps
             
         fkps = []
+        fkps_bbox = []
+        #print(kps)
         for kp in kps:
-            x, y, v = kp[:3]
+            #print(kp)
+            x, y, v, _, _, coords = kp
             fkps.append(x)
             fkps.append(y)
             fkps.append(v)
-            
-            #print label, polygons[label]
-        print(len(kps), len(fkps))
-        #nkps = len(kps)
 
+            # NOTE: convert coord to box
+            if coords is None:
+                #fkps_bbox.append([[0, 0]] * 4)
+                for i in range(8):
+                    fkps.append(0)
+            else:
+                assert len(coords) == 8, 'coords for field is incorrect {}'.format(coords)
+                for i in coords:
+                    fkps.append(i)
+                #fkps_bbox.append(coords)
         #print(label, polygon)
         cls_name = label.split('-')[0]
         if cls_name not in class_name_to_id:
@@ -324,6 +343,7 @@ def process(image_id, label_file, output_dir, class_name_to_id):
             segmentation = [polygon],
             num_keypoints = nkps,
             keypoints = fkps,
+            #keypoint_bboxes = fkps_bbox,
             #segmentation = segmentation,
             area=area,
             iscrowd = 0,
