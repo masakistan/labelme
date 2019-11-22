@@ -204,7 +204,7 @@ def process(image_id, label_file, output_dir, class_name_to_id):
         if shape['shape_type'] == 'polygon':
             coords = [coord for coords in points for coord in coords]
             if len(coords) > 8:
-                print("WARNING! polygon has more points than expeted {}".format(coords))
+                print("WARNING! polygon has more points than expeted in {}, {}".format(img_file, coords))
         elif shape['shape_type'] == 'rectangle':
             x1, y1 = points[0]
             x2, y2 = points[1]
