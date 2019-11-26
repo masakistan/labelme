@@ -39,8 +39,9 @@ class FormsDataset(Dataset):
 
     def __getitem__(self, image_id):
         label_file = osp.join(self.label_files[image_id])
-        img, out_img_file, annotations = process(image_id, label_file, self.out_dir, self.class_name_to_id)
-        return image_id, img, out_img_file, annotations
+        imgs, out_img_files, annotations = process(image_id, label_file, self.out_dir, self.class_name_to_id)
+        image_ids = [image_id * 10 + i for i in range(10)]
+        return image_ids, imgs, out_img_files, annotations
  
 
 def main():
@@ -116,23 +117,24 @@ def main():
     )
 
 
-    for image_id, img, out_img_file, annotations in img_dataloader:
-        print(image_id, out_img_file)
-        data['images'].append(dict(
-            license=0,
-            url=None,
-            file_name=osp.relpath(out_img_file, osp.dirname(out_ann_file)),
-            height=img.shape[0],
-            width=img.shape[1],
-            date_captured=None,
-            id=image_id,
-        ))
+    for image_ids, imgs, out_img_files, annotations in img_dataloader:
+        for image_id, img, out_img_file, annotation in zip(image_ids, imgs, out_img_files, annotations):
+            print(image_id, out_img_file)
+            data['images'].append(dict(
+                license=0,
+                url=None,
+                file_name=osp.relpath(out_img_file, osp.dirname(out_ann_file)),
+                height=img.shape[0],
+                width=img.shape[1],
+                date_captured=None,
+                id=image_id,
+            ))
 
-        for annotation in annotations:
-            annotation['id'] = annot_count
-            annot_count += 1
+            for annot in annotation:
+                annot['id'] = annot_count
+                annot_count += 1
 
-        data['annotations'].extend(annotations)
+            data['annotations'].extend(annotation)
         
     with open(out_ann_file, 'w') as f:
         json.dump(data, f)
@@ -143,72 +145,91 @@ def main():
 
 def process(image_id, label_file, output_dir, class_name_to_id):
     #print('Generating dataset from:', label_file)
+    deg_range = 15
     with open(label_file) as f:
         label_data = json.load(f)
 
     base = osp.splitext(osp.basename(label_file))[0]
-    out_img_file = osp.join(
-        output_dir, 'JPEGImages', base + '.jpg'
-    )
-
     # NOTE: copy the image file
     img_file = osp.join(
         osp.dirname(label_file), label_data['imagePath']
     )
-    img = np.asarray(PIL.Image.open(img_file))
+    orig_img = np.asarray(PIL.Image.open(img_file))
+    imgs = []
+    out_img_files = []
+    annotations = []
 
-    # NOTE: gather polygons
-    polygons = []
-    #masks = {}
-    for shape in label_data['shapes']:
-        points = shape['points']
-        label = shape['label']
-        shape_type = shape.get('shape_type', None)
-        mask = labelme.utils.shape_to_mask(
-            img.shape[:2], points, shape_type
+    img_center = tuple(np.array(orig_img.shape[1::-1]) / 2)
+
+    for i in range(10):
+        angle = random.uniform(deg_range * -1, deg_range)
+        m = cv2.getRotationMatrix2D(image_center, angle, 1.0)
+        img = cv2.warpAffine(orig_img, m, orig_img.shape[1::-1], flags=cv2.INTER_LINEAR)
+
+        # NOTE: gather polygons
+        polygons = []
+        out_img_file = osp.join(
+            output_dir, 'JPEGImages', base + '.jpg'
         )
 
-        mask = np.asfortranarray(mask.astype(np.uint8))
+        #masks = {}
+        for shape in label_data['shapes']:
+            points = shape['points']
+            label = shape['label']
+            shape_type = shape.get('shape_type', None)
+            mask = labelme.utils.shape_to_mask(
+                img.shape[:2], points, shape_type
+            )
 
-        if shape['shape_type'] == 'polygon':
-            coords = [coord for coords in points for coord in coords]
-        elif shape['shape_type'] == 'rectangle':
-            x1, y1 = points[0]
-            x2, y2 = points[1]
-            coords = [x1, y1, x1, y2, x2, y2, x2, y1]
-        else:
-            raise Exception('unknown shape type')
+            mask = np.asfortranarray(mask.astype(np.uint8))
 
-        polygons.append((label, mask, coords))
+            if shape['shape_type'] == 'polygon':
+                coords = [coord for coords in points for coord in coords]
+            elif shape['shape_type'] == 'rectangle':
+                x1, y1 = points[0]
+                x2, y2 = points[1]
+                coords = [x1, y1, x1, y2, x2, y2, x2, y1]
+            else:
+                raise Exception('unknown shape type')
 
-    annotations = []
-    for label, mask, polygon in polygons:
-        #print label, polygons[label]
-        #print(label, polygon)
-        cls_name = label.split('-')[0]
-        if cls_name not in class_name_to_id:
-            continue
-        cls_id = class_name_to_id[cls_name]
-        segmentation = pycocotools.mask.encode(mask)
-        segmentation['counts'] = segmentation['counts'].decode()
-        area = float(pycocotools.mask.area(segmentation))
-        bbox = list(pycocotools.mask.toBbox(segmentation))
-        annotations.append(dict(
-            segmentation = [polygon],
-            #segmentation = segmentation,
-            area=area,
-            iscrowd = 0,
-            #iscrowd = 1,
-            image_id=image_id,
-            category_id=cls_id,
-            id=-1,
-            bbox=bbox,
-        ))
-        #annot_count += 1
+            x = coords[0::2]
+            y = coords[1::2]
+            coords[0::2] = m[0][0] * x + m[0][1] * y + m[0][2]
+            coords[1::2] = m[1][0] * x + m[1][1] * y + m[1][2]
 
-    PIL.Image.fromarray(img).save(out_img_file)
-       
-    return img, out_img_file, annotations
+            polygons.append((label, mask, coords))
+
+        annotation = []
+        for label, mask, polygon in polygons:
+            #print label, polygons[label]
+            #print(label, polygon)
+            cls_name = label.split('-')[0]
+            if cls_name not in class_name_to_id:
+                continue
+            cls_id = class_name_to_id[cls_name]
+            segmentation = pycocotools.mask.encode(mask)
+            segmentation['counts'] = segmentation['counts'].decode()
+            area = float(pycocotools.mask.area(segmentation))
+            bbox = list(pycocotools.mask.toBbox(segmentation))
+            annotation.append(dict(
+                segmentation = [polygon],
+                #segmentation = segmentation,
+                area=area,
+                iscrowd = 0,
+                #iscrowd = 1,
+                image_id=image_id,
+                category_id=cls_id,
+                id=-1,
+                bbox=bbox,
+            ))
+            #annot_count += 1
+
+        PIL.Image.fromarray(img).save(out_img_file)
+        imgs.append(img)
+        out_img_files.append(out_img_file)
+        annotations.append(annotation)
+
+    return imgs, out_img_files, annotations
 
 
 if __name__ == '__main__':
