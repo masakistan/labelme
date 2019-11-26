@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from collections import Counter
-
+import math
 import argparse
 import datetime
 import glob
@@ -127,7 +127,7 @@ def main():
         img_dataset,
         batch_size = 1,
         shuffle = False,
-        num_workers = 0,
+        num_workers = 46,
         collate_fn = collate_images
     )
 
@@ -205,12 +205,16 @@ def process(image_id, label_file, output_dir, class_name_to_id):
             coords = [coord for coords in points for coord in coords]
             if len(coords) > 8:
                 print("WARNING! polygon has more points than expeted in {}, {}".format(img_file, coords))
+                coords = coords[:8]
         elif shape['shape_type'] == 'rectangle':
             x1, y1 = points[0]
             x2, y2 = points[1]
             coords = [x1, y1, x1, y2, x2, y2, x2, y1]
         else:
             raise Exception('unknown shape type')
+
+        for i in coords:
+            assert not math.isnan(i), "ERROR! NaN found! {}, {}".format(img_file, coords)
         ys = [coords[i] for i in range(1, len(coords), 2)]
         y_center = int((min(ys) + max(ys)) // 2)
         xs = [coords[i] for i in range(0, len(coords), 2)]
