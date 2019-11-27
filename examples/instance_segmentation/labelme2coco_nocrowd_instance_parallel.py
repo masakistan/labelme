@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+import random
 import argparse
 import datetime
 import glob
@@ -7,12 +7,15 @@ import json
 import os
 import os.path as osp
 import sys
+import cv2
 
 import numpy as np
 import PIL.Image
 
 from torch.utils.data import DataLoader, Dataset
 import labelme
+
+VARS = 10
 
 try:
     import pycocotools.mask
@@ -39,8 +42,9 @@ class FormsDataset(Dataset):
 
     def __getitem__(self, image_id):
         label_file = osp.join(self.label_files[image_id])
-        imgs, out_img_files, annotations = process(image_id, label_file, self.out_dir, self.class_name_to_id)
-        image_ids = [image_id * 10 + i for i in range(10)]
+        image_ids = [image_id * VARS + i for i in range(10)]
+        imgs, out_img_files, annotations = process(image_ids, label_file, self.out_dir, self.class_name_to_id)
+        print('image_ids', image_ids)
         return image_ids, imgs, out_img_files, annotations
  
 
@@ -124,8 +128,8 @@ def main():
                 license=0,
                 url=None,
                 file_name=osp.relpath(out_img_file, osp.dirname(out_ann_file)),
-                height=img.shape[0],
-                width=img.shape[1],
+                height=img[0],
+                width=img[1],
                 date_captured=None,
                 id=image_id,
             ))
@@ -143,7 +147,7 @@ def main():
     #label_files = glob.glob(osp.join(args.input_dir, '*.json'))
     #for image_id, label_file in enumerate(label_files):
 
-def process(image_id, label_file, output_dir, class_name_to_id):
+def process(image_ids, label_file, output_dir, class_name_to_id):
     #print('Generating dataset from:', label_file)
     deg_range = 15
     with open(label_file) as f:
@@ -161,21 +165,26 @@ def process(image_id, label_file, output_dir, class_name_to_id):
 
     img_center = tuple(np.array(orig_img.shape[1::-1]) / 2)
 
-    for i in range(10):
+    for i, image_id in zip(range(VARS), image_ids):
         angle = random.uniform(deg_range * -1, deg_range)
-        m = cv2.getRotationMatrix2D(image_center, angle, 1.0)
+        if i == 0:
+            angle = 0.
+        print('doing image', i, angle)
+        m = cv2.getRotationMatrix2D(img_center, angle, 1.0)
         img = cv2.warpAffine(orig_img, m, orig_img.shape[1::-1], flags=cv2.INTER_LINEAR)
 
         # NOTE: gather polygons
         polygons = []
         out_img_file = osp.join(
-            output_dir, 'JPEGImages', base + '.jpg'
+            output_dir, 'JPEGImages', base + '_' + str(i) + '.jpg'
         )
 
         #masks = {}
         for shape in label_data['shapes']:
             points = shape['points']
             label = shape['label']
+            if 'name' not in label:
+                continue
             shape_type = shape.get('shape_type', None)
             mask = labelme.utils.shape_to_mask(
                 img.shape[:2], points, shape_type
@@ -192,12 +201,16 @@ def process(image_id, label_file, output_dir, class_name_to_id):
             else:
                 raise Exception('unknown shape type')
 
+            coords = np.array(coords)
             x = coords[0::2]
             y = coords[1::2]
+            #print(m)
+            #print(x)
+            #print(y)
             coords[0::2] = m[0][0] * x + m[0][1] * y + m[0][2]
             coords[1::2] = m[1][0] * x + m[1][1] * y + m[1][2]
 
-            polygons.append((label, mask, coords))
+            polygons.append((label, mask, coords.tolist()))
 
         annotation = []
         for label, mask, polygon in polygons:
@@ -225,7 +238,7 @@ def process(image_id, label_file, output_dir, class_name_to_id):
             #annot_count += 1
 
         PIL.Image.fromarray(img).save(out_img_file)
-        imgs.append(img)
+        imgs.append(img.shape)
         out_img_files.append(out_img_file)
         annotations.append(annotation)
 
