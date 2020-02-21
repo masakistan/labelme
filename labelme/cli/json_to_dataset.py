@@ -4,8 +4,8 @@ import json
 import os
 import os.path as osp
 
+import imgviz
 import PIL.Image
-import yaml
 
 from labelme.logger import logger
 from labelme import utils
@@ -32,10 +32,9 @@ def main():
         os.mkdir(out_dir)
 
     data = json.load(open(json_file))
+    imageData = data.get('imageData')
 
-    if data['imageData']:
-        imageData = data['imageData']
-    else:
+    if not imageData:
         imagePath = os.path.join(os.path.dirname(json_file), data['imagePath'])
         with open(imagePath, 'rb') as f:
             imageData = f.read()
@@ -50,12 +49,17 @@ def main():
         else:
             label_value = len(label_name_to_value)
             label_name_to_value[label_name] = label_value
-    lbl = utils.shapes_to_label(img.shape, data['shapes'], label_name_to_value)
+    lbl, _ = utils.shapes_to_label(
+        img.shape, data['shapes'], label_name_to_value
+    )
 
     label_names = [None] * (max(label_name_to_value.values()) + 1)
     for name, value in label_name_to_value.items():
         label_names[value] = name
-    lbl_viz = utils.draw_label(lbl, img, label_names)
+
+    lbl_viz = imgviz.label2rgb(
+        label=lbl, img=imgviz.asgray(img), label_names=label_names, loc='rb'
+    )
 
     PIL.Image.fromarray(img).save(osp.join(out_dir, 'img.png'))
     utils.lblsave(osp.join(out_dir, 'label.png'), lbl)
@@ -64,11 +68,6 @@ def main():
     with open(osp.join(out_dir, 'label_names.txt'), 'w') as f:
         for lbl_name in label_names:
             f.write(lbl_name + '\n')
-
-    logger.warning('info.yaml is being replaced by label_names.txt')
-    info = dict(label_names=label_names)
-    with open(osp.join(out_dir, 'info.yaml'), 'w') as f:
-        yaml.safe_dump(info, f, default_flow_style=False)
 
     logger.info('Saved to: {}'.format(out_dir))
 

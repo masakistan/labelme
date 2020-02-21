@@ -2,12 +2,20 @@ auto_save: false
 display_label_popup: true
 store_data: true
 keep_prev: false
+keep_prev_scale: false
+logger_level: info
 
 flags: null
+label_flags: null
 labels: null
 file_search: null
 sort_labels: true
 validate_label: null
+
+default_shape_color: null
+shape_color: auto   # null, 'auto', 'manual'
+shift_auto_shape_color: 0
+label_colors: null
 
 # main
 flag_dock:
@@ -38,7 +46,12 @@ fit_to_content:
   column: true
   row: false
 
-epsilon: 11.0
+# canvas
+epsilon: 10.0
+canvas:
+  # None: do nothing
+  # close: close polygon
+  double_click: close
 
 shortcuts:
   close: Ctrl+W
@@ -48,6 +61,7 @@ shortcuts:
   save: Ctrl+S
   save_as: Ctrl+Shift+S
   save_to: null
+  delete_file: Ctrl+Delete
 
   open_next: [D, Ctrl+Shift+D]
   open_prev: [A, Ctrl+Shift+A]
@@ -58,7 +72,6 @@ shortcuts:
   fit_window: Ctrl+F
   fit_width: Ctrl+Shift+F
 
-  add_point: Ctrl+Shift+P
   create_polygon: Ctrl+N
   create_rectangle: Ctrl+R
   create_circle: null
@@ -70,7 +83,6 @@ shortcuts:
   duplicate_polygon: Ctrl+D
   undo: Ctrl+Z
   undo_last_point: [Ctrl+Z, Backspace]
+  add_point_to_edge: Ctrl+Shift+P
   edit_label: Ctrl+E
-  edit_line_color: Ctrl+L
-  edit_fill_color: Ctrl+Shift+L
   toggle_keep_prev_mode: Ctrl+P

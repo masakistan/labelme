@@ -1,8 +1,12 @@
 import argparse
 import codecs
+import logging
 import os
+import os.path as osp
 import sys
+import yaml
 
+from qtpy import QtCore
 from qtpy import QtWidgets
 
 from labelme import __appname__
@@ -14,19 +18,18 @@ from labelme.utils import newIcon
 
 
 def main():
-    try:
-        _main()
-    except Exception as e:
-        logger.error(e)
-
-
-def _main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--version', '-V', action='store_true', help='show version'
     )
     parser.add_argument(
         '--reset-config', action='store_true', help='reset qt config'
+    )
+    parser.add_argument(
+        '--logger-level',
+        default='info',
+        choices=['debug', 'info', 'warning', 'fatal', 'error'],
+        help='logger level',
     )
     parser.add_argument('filename', nargs='?', help='image or label filename')
     parser.add_argument(
@@ -39,8 +42,10 @@ def _main():
     default_config_file = os.path.join(os.path.expanduser('~'), '.labelmerc')
     parser.add_argument(
         '--config',
-        dest='config_file',
-        help='config file (default: %s)' % default_config_file,
+        dest='config',
+        help='config file or yaml-format string (default: {})'.format(
+            default_config_file
+        ),
         default=default_config_file,
     )
     # config for the gui
@@ -71,6 +76,14 @@ def _main():
         default=argparse.SUPPRESS,
     )
     parser.add_argument(
+        '--labelflags',
+        dest='label_flags',
+        help='yaml string of label specific flags OR file containing json '
+             'string of label specific flags (ex. {person-\d+: [male, tall], '
+             'dog-\d+: [black, brown, white], .*: [occluded]})',  # NOQA
+        default=argparse.SUPPRESS,
+    )
+    parser.add_argument(
         '--labels',
         help='comma separated list of labels OR file containing labels',
         default=argparse.SUPPRESS,
@@ -78,7 +91,7 @@ def _main():
     parser.add_argument(
         '--validatelabel',
         dest='validate_label',
-        choices=['exact', 'instance'],
+        choices=['exact'],
         help='label validation types',
         default=argparse.SUPPRESS,
     )
@@ -100,6 +113,8 @@ def _main():
         print('{0} {1}'.format(__appname__, __version__))
         sys.exit(0)
 
+    logger.setLevel(getattr(logging, args.logger_level.upper()))
+
     if hasattr(args, 'flags'):
         if os.path.isfile(args.flags):
             with codecs.open(args.flags, 'r', encoding='utf-8') as f:
@@ -114,13 +129,20 @@ def _main():
         else:
             args.labels = [l for l in args.labels.split(',') if l]
 
+    if hasattr(args, 'label_flags'):
+        if os.path.isfile(args.label_flags):
+            with codecs.open(args.label_flags, 'r', encoding='utf-8') as f:
+                args.label_flags = yaml.safe_load(f)
+        else:
+            args.label_flags = yaml.safe_load(args.label_flags)
+
     config_from_args = args.__dict__
     config_from_args.pop('version')
     reset_config = config_from_args.pop('reset_config')
     filename = config_from_args.pop('filename')
     output = config_from_args.pop('output')
-    config_file = config_from_args.pop('config_file')
-    config = get_config(config_from_args, config_file)
+    config_file_or_yaml = config_from_args.pop('config')
+    config = get_config(config_file_or_yaml, config_from_args)
 
     if not config['labels'] and config['validate_label']:
         logger.error('--labels must be specified with --validatelabel or '
@@ -136,9 +158,15 @@ def _main():
         else:
             output_dir = output
 
+    translator = QtCore.QTranslator()
+    translator.load(
+        QtCore.QLocale.system().name(),
+        osp.dirname(osp.abspath(__file__)) + '/translate'
+    )
     app = QtWidgets.QApplication(sys.argv)
     app.setApplicationName(__appname__)
     app.setWindowIcon(newIcon('icon'))
+    app.installTranslator(translator)
     win = MainWindow(
         config=config,
         filename=filename,
@@ -154,3 +182,8 @@ def _main():
     win.show()
     win.raise_()
     sys.exit(app.exec_())
+
+
+# this main block is required to generate executable by pyinstaller
+if __name__ == '__main__':
+    main()
