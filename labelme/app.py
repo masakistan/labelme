@@ -115,18 +115,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.uniqLabelList.setToolTip(self.tr(
             "Select label to start annotating for it. "
             "Press 'Esc' to deselect."))
-        self.autolabel = False
-        print("fart")
         if self._config['labels']:
             for label in self._config['labels']:
                 item = self.uniqLabelList.createItemFromLabel(label)
                 self.uniqLabelList.addItem(item)
                 rgb = self._get_rgb_by_label(label)
                 self.uniqLabelList.setItemLabel(item, label, rgb)
-                print(self._config['labels'])
-                if len(self._config['labels']) == 1:
-                    self.autolabel = True
-        print("dont farting")
         self.label_dock = QtWidgets.QDockWidget(self.tr(u'Label List'), self)
         self.label_dock.setObjectName(u'Label List')
         self.label_dock.setWidget(self.uniqLabelList)
@@ -1156,24 +1150,15 @@ class MainWindow(QtWidgets.QMainWindow):
         """
         items = self.uniqLabelList.selectedItems()
         text = None
-
-        if self.uniqLabelList.currentItem():
-            self.autolabel = True
-            cur_item = self.uniqLabelList.currentItem()
-            cur_widget = self.uniqLabelList.itemWidget(cur_item)
-            
         if items:
             text = items[0].data(Qt.UserRole)
         flags = {}
         group_id = None
-        if self.autolabel:
-            text = self.labelDialog.edit.text()
-        else:
-            if self._config['display_label_popup'] or not text:
-                previous_text = self.labelDialog.edit.text()
-                text, flags, group_id = self.labelDialog.popUp(text)
-                if not text:
-                    self.labelDialog.edit.setText(previous_text)
+        if self._config['display_label_popup'] and not text:
+            previous_text = self.labelDialog.edit.text()
+            text, flags, group_id = self.labelDialog.popUp(text)
+            if not text:
+                self.labelDialog.edit.setText(previous_text)
 
         if text and not self.validateLabel(text):
             self.errorMessage(
